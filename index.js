@@ -417,83 +417,85 @@ client.on('interactionCreate', async interaction => {
     }
     
     // ========== /player ==========
-    if (interaction.commandName === 'player') {
-        await interaction.deferReply();
-        
-        const serverId = interaction.options.getString('server');
-        const searchName = interaction.options.getString('nama').toLowerCase();
-        const server = serverDatabase.find(s => s.id === serverId);
-        
-        if (!server) {
-            await interaction.editReply('❌ Server tidak ditemukan');
-            return;
-        }
-        
-        // await interaction.editReply(`🔍 Mencari **${searchName}** di **${server.name}**...`);
-        
-        const data = await getServerInfo(server);
-        
-        if (!data.online) {
-            await interaction.editReply(`❌ Server **${server.name}** sedang offline`);
-            return;
-        }
-        
-        const matchedPlayers = data.playersList.filter(p => 
-            p.name.toLowerCase().includes(searchName)
-        );
-        
-        if (matchedPlayers.length === 0) {
-            await interaction.editReply(`❌ Tidak ditemukan pemain dengan nama **"${searchName}"** di **${server.name}**`);
-            return;
-        }
-        
-        const avgPing = Math.round(matchedPlayers.reduce((sum, p) => sum + p.ping, 0) / matchedPlayers.length);
-        const itemsPerPage = 10;
-        const { table, totalPages } = createSearchTable(matchedPlayers, 1, itemsPerPage);
-        
-        const infoText = `🔍 **Query:** ${searchName}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** ${matchedPlayers.length} ditemukan\n📶 **Avg Ping:** ${avgPing}ms`;
-        
-        const embed = new EmbedBuilder()
-            .setTitle(`🔍 ${data.name} - Tracker`)
-            .setDescription(infoText)
-            .addFields({ name: '📋 Hasil Pencarian', value: table })
-            .setColor(0x9B59B6)
-            .setFooter({ text: `✨ Requested by ${interaction.user.username}` })
-            .setTimestamp();
-        
-        if (server.logo && !server.logo.includes("xxx")) {
-            embed.setThumbnail(server.logo);
-        }
-        
-        if (totalPages > 1) {
-            const row = createPaginationButtons(1, totalPages, server.id, "search");
-            await interaction.editReply({ embeds: [embed], components: [row] });
-            
-            let currentPage = 1;
-            const filter = i => i.user.id === interaction.user.id;
-            const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
-            
-            collector.on('collect', async i => {
-                if (i.customId.startsWith('search_prev_')) currentPage--;
-                else if (i.customId.startsWith('search_next_')) currentPage++;
-                else return;
-                
-                const { table: newTable } = createSearchTable(matchedPlayers, currentPage, itemsPerPage);
-                const newEmbed = EmbedBuilder.from(embed)
-                    .spliceFields(0, 1, { name: '📋 Hasil Pencarian', value: newTable });
-                const newRow = createPaginationButtons(currentPage, totalPages, server.id, "search");
-                
-                if (newRow) {
-                    await i.update({ embeds: [newEmbed], components: [newRow] });
-                } else {
-                    await i.update({ embeds: [newEmbed], components: [] });
-                }
-            });
-        } else {
-            await interaction.editReply({ embeds: [embed] });
-        }
+if (interaction.commandName === 'player') {
+    await interaction.deferReply();
+    
+    const serverId = interaction.options.getString('server');
+    const searchName = interaction.options.getString('nama').toLowerCase();
+    const server = serverDatabase.find(s => s.id === serverId);
+    
+    if (!server) {
+        await interaction.editReply('❌ Server tidak ditemukan');
         return;
     }
+    
+    const data = await getServerInfo(server);
+    
+    if (!data.online) {
+        await interaction.editReply(`❌ Server **${server.name}** sedang offline`);
+        return;
+    }
+    
+    const matchedPlayers = data.playersList.filter(p => 
+        p.name.toLowerCase().includes(searchName)
+    );
+    
+    if (matchedPlayers.length === 0) {
+        await interaction.editReply(`❌ Tidak ditemukan pemain dengan nama **"${searchName}"** di **${server.name}**`);
+        return;
+    }
+    
+    const avgPing = Math.round(matchedPlayers.reduce((sum, p) => sum + p.ping, 0) / matchedPlayers.length);
+    const itemsPerPage = 10;
+    const { table, totalPages } = createSearchTable(matchedPlayers, 1, itemsPerPage);
+    
+    // ============ FORMAT HASIL DENGAN BOLD ============
+    const boldCount = `**${matchedPlayers.length}**`;
+    const boldQuery = `**${searchName}**`;
+    
+    const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} (${boldQuery})\n📶 **Avg Ping:** ${avgPing}ms`;
+    
+    const embed = new EmbedBuilder()
+        .setTitle(`🔍 ${data.name} - Tracker`)
+        .setDescription(infoText)
+        .addFields({ name: '📋 Hasil Pencarian', value: table })
+        .setColor(0x9B59B6)
+        .setFooter({ text: `✨ Requested by ${interaction.user.username}` })
+        .setTimestamp();
+    
+    if (server.logo && !server.logo.includes("xxx")) {
+        embed.setThumbnail(server.logo);
+    }
+    
+    if (totalPages > 1) {
+        const row = createPaginationButtons(1, totalPages, server.id, "search");
+        await interaction.editReply({ embeds: [embed], components: [row] });
+        
+        let currentPage = 1;
+        const filter = i => i.user.id === interaction.user.id;
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
+        
+        collector.on('collect', async i => {
+            if (i.customId.startsWith('search_prev_')) currentPage--;
+            else if (i.customId.startsWith('search_next_')) currentPage++;
+            else return;
+            
+            const { table: newTable } = createSearchTable(matchedPlayers, currentPage, itemsPerPage);
+            const newEmbed = EmbedBuilder.from(embed)
+                .spliceFields(0, 1, { name: '📋 Hasil Pencarian', value: newTable });
+            const newRow = createPaginationButtons(currentPage, totalPages, server.id, "search");
+            
+            if (newRow) {
+                await i.update({ embeds: [newEmbed], components: [newRow] });
+            } else {
+                await i.update({ embeds: [newEmbed], components: [] });
+            }
+        });
+    } else {
+        await interaction.editReply({ embeds: [embed] });
+    }
+    return;
+}
     
     // ========== /playerid ==========
     if (interaction.commandName === 'playerid') {
