@@ -15,7 +15,8 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 1000,
         logo: "https://cdn.discordapp.com/attachments/1373778515098468382/1485635560537325670/CR.png?ex=6a2e07af&is=6a2cb62f&hm=f481b70230b386421d0c1b6d004ce923df60aaebf0573fa978b69bb2f4b8721a&",
-        description: "Server RP Indonesia terpopuler"
+        description: "Server RP Indonesia terpopuler",
+        connect: "connect play.ceritaroleplayku.id"  // ← Tambahkan ini
     },
     {
         id: "kotakita",
@@ -24,7 +25,8 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 2048,
         logo: "https://media.discordapp.net/attachments/832162287380725770/1423173258215297034/KOTAKITA.1.png?ex=6a2d8d22&is=6a2c3ba2&hm=b9affba15e54a7370f3ac52e247d7b033ef45ffd92ceda7244bde659411b0797&=&format=webp&quality=lossless&width=766&height=552",
-        description: "#5TILLKOTAKITA"
+        description: "#5TILLKOTAKITA",
+        connect: "connect fivem.kotakitarp.id"  // ← Tambahkan ini
     },
     {
         id: "ime",
@@ -33,7 +35,8 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 2048,
         logo: "https://imeroleplay.com/favicon.webp",
-        description: "iMe Roleplay"
+        description: "iMe Roleplay",
+        connect: "connect main.imeroleplay.com"  // ← Tambahkan ini
     },
     {
         id: "ckrp",
@@ -42,7 +45,8 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 666,
         logo: "https://www.ceritakitarp.com/logo.png",
-        description: "SETIAP CERITA ADALAH BAGIAN DARI KITA"
+        description: "SETIAP CERITA ADALAH BAGIAN DARI KITA",
+        connect: "connect satu.ceritakitarp.com"  // ← Tambahkan ini
     },
     {
         id: "knrp",
@@ -51,7 +55,8 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 1000,
         logo: "https://frontend.cfx-services.net/api/servers/icon/gad5d7z/1411448061.png",
-        description: "MENGHARGAI DAN MENGHORMATI    "
+        description: "MENGHARGAI DAN MENGHORMATI",
+        connect: "connect 49.128.187.82:30120"  // ← Tambahkan ini
     }
 ];
 
@@ -372,14 +377,15 @@ client.on('interactionCreate', async interaction => {
         const itemsPerPage = 20;
         const { table, totalPages } = createPlayerTable(data.playersList, 1, itemsPerPage);
         
-        const infoText = `📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} / ${data.maxPlayers} Pemain\n📶 **Avg Ping:** ${avgPing}ms\n📊 **Occupancy:** ${bar} ${occupancy}%\n🏷️ **Mode:** ${data.gametype}`;
+        const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
+        const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} ${boldQuery}\n📶 **Avg Ping:** ${avgPing}ms${connectText}`;
         
+        const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
         const embed = new EmbedBuilder()
-            .setTitle(` ${data.name} - Tracker`)
-            .setDescription(infoText)
-            .addFields({ name: 'Player Online', value: table })
+            .setTitle(`👤 Player Detail`)
+            .setDescription(`${signal} **${player.name}**\n🆔 **ID:** ${player.id}\n📶 **Ping:** ${player.ping}ms${connectText}`)
             .setColor(0x2ECC71)
-            .setFooter({ text: `⚡ Data real-time • Track by ${interaction.user.username}` })
+            .setFooter({ text: `⚡ Data real-time • ${data.name}` })
             .setTimestamp();
         
         if (server.logo && !server.logo.includes("xxx")) {
