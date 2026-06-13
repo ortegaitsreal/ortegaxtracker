@@ -133,7 +133,7 @@ async function getServerInfo(server) {
     }
 }
 
-// ============ MEMBUAT TABEL PLAYER (25 per halaman - FIXED DEFAULT) ============
+// ============ MEMBUAT TABEL PLAYER (Nomor, Signal, ID, Nama) ============
 function createPlayerTable(players, page = 1, itemsPerPage = 20) {
     if (!players || players.length === 0) return { table: "Tidak ada pemain online", totalPages: 1 };
     
@@ -144,13 +144,21 @@ function createPlayerTable(players, page = 1, itemsPerPage = 20) {
     
     let table = "";
     for (const player of pagePlayers) {
+        // Nomor (rata tengah)
         const no = player.no.toString();
         const noCenter = no.padStart(2, ' ').padEnd(3, ' ');
+        
+        // Signal
+        const signal = getSignalSymbol(player.ping);
+        
+        // ID (rata tengah)
         const id = player.id.toString();
         const idCenter = id.padStart(3, ' ').padEnd(4, ' ');
-        const signal = getSignalSymbol(player.ping);
+        
+        // Nama
         const name = player.name.length > 45 ? player.name.substring(0, 42) + "..." : player.name;
-        table += `\`${noCenter}\` \`${idCenter}\` ${signal} **${name}**\n`;
+        
+        table += `\`${noCenter}\` ${signal} \`${idCenter}\` **${name}**\n`;
         
         if (table.length > 900) break;
     }
@@ -158,7 +166,7 @@ function createPlayerTable(players, page = 1, itemsPerPage = 20) {
     return { table, totalPages };
 }
 
-// ============ MEMBUAT TABEL HASIL PENCARIAN (25 per halaman - FIXED DEFAULT) ============
+// ============ MEMBUAT TABEL HASIL PENCARIAN (Nomor, Signal, ID, Nama) ============
 function createSearchTable(players, page = 1, itemsPerPage = 20) {
     if (!players || players.length === 0) return { table: "Tidak ada hasil", totalPages: 1 };
     
@@ -171,11 +179,11 @@ function createSearchTable(players, page = 1, itemsPerPage = 20) {
     for (const player of pagePlayers) {
         const no = player.no.toString();
         const noCenter = no.padStart(2, ' ').padEnd(3, ' ');
+        const signal = getSignalSymbol(player.ping);
         const id = player.id.toString();
         const idCenter = id.padStart(3, ' ').padEnd(4, ' ');
-        const signal = getSignalSymbol(player.ping);
         const name = player.name.length > 45 ? player.name.substring(0, 42) + "..." : player.name;
-        table += `\`${noCenter}\` \`${idCenter}\` ${signal} **${name}**\n`;
+        table += `\`${noCenter}\` ${signal} \`${idCenter}\` **${name}**\n`;
         
         if (table.length > 900) break;
     }
