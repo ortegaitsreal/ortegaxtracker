@@ -1,4 +1,4 @@
-// index.js - Bot FiveM Player Tracker (Konsisten Format)
+// index.js - Bot FiveM Player Tracker (Dengan Command /commands)
 const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 require('dotenv').config();
 
@@ -65,10 +65,10 @@ const cache = new Map();
 const CACHE_DURATION = 15000;
 
 // ============ CUSTOM EMOJI SIGNAL ============
-const SIGNAL_HIJAU = '<:EG:1515433046084550728>';
-const SIGNAL_KUNING = '<:EY:1515433024043483206>';
-const SIGNAL_ORANGE = '<:EO:1515432999506935981>';
-const SIGNAL_RED = '<:ER:1515432975922102324>';
+const SIGNAL_HIJAU = '<:EG:1515432481350750500>';
+const SIGNAL_KUNING = '<:EY:1515432461612617748>';
+const SIGNAL_ORANGE = '<:EO:1515432436337610883>';
+const SIGNAL_RED = '<:ER:1515432406373372205>';
 
 function getSignalSymbol(ping) {
     if (ping <= 50) return SIGNAL_HIJAU;
@@ -280,7 +280,7 @@ client.once('ready', async () => {
     console.log(`📋 Menampilkan 30 player per halaman`);
     console.log(`🔍 Multiple ID support: 1,2,3 atau 1-10 atau 1,3-5,10`);
     
-    client.user.setActivity('Track Your Player', { type: 3 });
+    client.user.setActivity('/commands for help', { type: 3 });
     
     const commands = [
         new SlashCommandBuilder().setName('playerall').setDescription('Tampilkan semua pemain online di server')
@@ -294,13 +294,15 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('server').setDescription('Pilih server').setRequired(true)
                 .addChoices(...serverDatabase.map(s => ({ name: s.name, value: s.id }))))
             .addStringOption(option => option.setName('id').setDescription('ID pemain (contoh: 972 atau 1,2,3 atau 1-10)').setRequired(true)),
-        new SlashCommandBuilder().setName('server').setDescription('Lihat daftar server yang tersedia')
+        new SlashCommandBuilder().setName('server').setDescription('Lihat daftar server yang tersedia'),
+        new SlashCommandBuilder().setName('commands').setDescription('Menampilkan daftar semua perintah bot')
     ];
 
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands.map(cmd => cmd.toJSON()) });
         console.log('✅ Command siap digunakan!');
+        console.log('📝 Gunakan /commands untuk melihat panduan');
     } catch (error) {
         console.error(error);
     }
@@ -309,6 +311,54 @@ client.once('ready', async () => {
 // ============ HANDLE COMMANDS ============
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
+
+    // ============ /commands ============
+    if (interaction.commandName === 'commands') {
+        const embed = new EmbedBuilder()
+            .setTitle('📋 Daftar Perintah Bot FiveM Tracker')
+            .setDescription('Berikut adalah daftar perintah yang tersedia untuk melacak pemain di server FiveM:')
+            .setColor(0x00AE86)
+            .setThumbnail(client.user.displayAvatarURL())
+            .addFields(
+                {
+                    name: '/playerall',
+                    value: '```📌 Tampilkan semua pemain online di server\n🔧 Penggunaan: /playerall server:<nama_server>\n```',
+                    inline: false
+                },
+                {
+                    name: '/player',
+                    value: '```📌 Cari pemain berdasarkan nama\n🔧 Penggunaan: /player server:<nama_server> nama:<nama_pemain>\n```',
+                    inline: false
+                },
+                {
+                    name: '/playerid',
+                    value: '```📌 Cari pemain berdasarkan ID (support multiple)\n🔧 Penggunaan: /playerid server:<nama_server> id:<id_pemain>\n📝 Contoh: \n• Single: /playerid server:cerita id:972\n• Multiple: /playerid server:cerita id:972,100,205\n• Range: /playerid server:cerita id:1-10\n• Kombinasi: /playerid server:cerita id:1,3,5-8,10```',
+                    inline: false
+                },
+                {
+                    name: '/server',
+                    value: '```📌 Lihat daftar server yang tersedia\n🔧 Penggunaan: /server\n📝 Contoh: /server```',
+                    inline: false
+                },
+                {
+                    name: '/commands',
+                    value: '```📌 Menampilkan daftar perintah ini\n🔧 Penggunaan: /commands\n📝 Contoh: /commands```',
+                    inline: false
+                }
+            )
+            .addFields(
+                {
+                    name: '📊 Informasi Tambahan',
+                    value: `**Signal Ping:**\n${SIGNAL_HIJAU} Hijau: ≤ 50 ms (Sangat Baik)\n${SIGNAL_KUNING} Kuning: 51-100 ms (Baik)\n${SIGNAL_ORANGE} Orange: 101-200 ms (Sedang)\n${SIGNAL_RED} Merah: > 200 ms (Buruk)\n\n⚡ **Cache:** Data disimpan selama 15 detik untuk mempercepat respon\n📋 **Pagination:** Gunakan tombol ◀ dan ▶ untuk navigasi halaman\n💡 **Tip:** Gunakan Tab untuk melihat pilihan server yang tersedia`,
+                    inline: false
+                }
+            )
+            .setFooter({ text: `⚡ FiveM Player Tracker • Gunakan command dengan benar` })
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [embed] });
+        return;
+    }
 
     // ============ /server ============
     if (interaction.commandName === 'server') {
@@ -450,7 +500,6 @@ client.on('interactionCreate', async interaction => {
             return await interaction.editReply({ embeds: [embed] });
         }
         
-        // Parse multiple ID input
         const searchIds = parseIdInput(idInput);
         
         if (searchIds.length === 0) {
@@ -458,7 +507,6 @@ client.on('interactionCreate', async interaction => {
             return await interaction.editReply({ embeds: [embed] });
         }
         
-        // Cari player berdasarkan ID
         const foundPlayers = [];
         const notFoundIds = [];
         
