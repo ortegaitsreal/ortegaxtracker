@@ -377,15 +377,16 @@ client.on('interactionCreate', async interaction => {
         const itemsPerPage = 20;
         const { table, totalPages } = createPlayerTable(data.playersList, 1, itemsPerPage);
         
+        // ============ TAMPILKAN CONNECT CODE ============
         const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
-        const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} ${boldQuery}\n📶 **Avg Ping:** ${avgPing}ms${connectText}`;
+        const infoText = `📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} / ${data.maxPlayers} Pemain\n📶 **Avg Ping:** ${avgPing}ms\n📊 **Occupancy:** ${bar} ${occupancy}%\n🏷️ **Mode:** ${data.gametype}${connectText}`;
         
-        const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
         const embed = new EmbedBuilder()
-            .setTitle(`👤 Player Detail`)
-            .setDescription(`${signal} **${player.name}**\n🆔 **ID:** ${player.id}\n📶 **Ping:** ${player.ping}ms${connectText}`)
+            .setTitle(` ${data.name} - Tracker`)
+            .setDescription(infoText)
+            .addFields({ name: 'Player Online', value: table })
             .setColor(0x2ECC71)
-            .setFooter({ text: `⚡ Data real-time • ${data.name}` })
+            .setFooter({ text: `⚡ Data real-time • Track by ${interaction.user.username}` })
             .setTimestamp();
         
         if (server.logo && !server.logo.includes("xxx")) {
@@ -459,7 +460,8 @@ if (interaction.commandName === 'player') {
     const boldCount = `**${matchedPlayers.length}**`;
     const boldQuery = `**${searchName}**`;
     
-    const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} ${boldQuery}\n📶 **Avg Ping:** ${avgPing}ms`;
+    const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
+    const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} ${boldQuery}\n📶 **Avg Ping:** ${avgPing}ms${connectText}`;
     
     const embed = new EmbedBuilder()
         .setTitle(`🔍 ${data.name} - Tracker`)
@@ -534,9 +536,10 @@ if (interaction.commandName === 'player') {
         
         const signal = getSignalSymbol(player.ping);
         
+        const connectText = server.connect ? `\n🔌 **Connect:** \`${server.connect}\`` : '';
         const embed = new EmbedBuilder()
             .setTitle(`👤 Player Detail`)
-            .setDescription(`${signal} **${player.name}**\n🆔 **ID:** ${player.id}\n📶 **Ping:** ${player.ping}ms`)
+            .setDescription(`${signal} **${player.name}**\n🆔 **ID:** ${player.id}\n📶 **Ping:** ${player.ping}ms${connectText}`)
             .setColor(0x2ECC71)
             .setFooter({ text: `⚡ Data real-time • ${data.name}` })
             .setTimestamp();
