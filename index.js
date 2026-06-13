@@ -253,7 +253,7 @@ client.on('interactionCreate', async interaction => {
         const connectText = server.connect ? `\n🔌 **Connect:**\n\`\`\`\n${server.connect}\n\`\`\`` : '';
         
         const embed = new EmbedBuilder()
-            .setTitle(`🎮 ${data.name} - Tracker`)
+            .setTitle(`${data.name} - Tracker`)
             .setDescription(`📡 **Server:** ${data.name}\n👥 **Online:** ${data.players}/${data.maxPlayers}\n📶 **Avg Ping:** ${avgPing}ms\n📊 **Occupancy:** ${bar} ${occupancy}%\n🏷️ **Mode:** ${data.gametype}${connectText}`)
             .addFields({ name: 'Player Online', value: table })
             .setColor(0x2ECC71).setFooter({ text: `⚡ Track by ${interaction.user.username}` }).setTimestamp();
