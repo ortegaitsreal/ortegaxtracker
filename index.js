@@ -453,7 +453,7 @@ if (interaction.commandName === 'player') {
     const boldCount = `**${matchedPlayers.length}**`;
     const boldQuery = `**${searchName}**`;
     
-    const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} (${boldQuery})\n📶 **Avg Ping:** ${avgPing}ms`;
+    const infoText = `🔍 **Query:** ${boldQuery}\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** Ditemukan ${boldCount} ${boldQuery}\n📶 **Avg Ping:** ${avgPing}ms`;
     
     const embed = new EmbedBuilder()
         .setTitle(`🔍 ${data.name} - Tracker`)
