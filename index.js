@@ -243,6 +243,19 @@ client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} siap beraksi!`);
     console.log(`📡 ${serverDatabase.length} server terdaftar`);
     
+    // ============ SET BOT STATUS ============
+    client.user.setPresence({
+        status: 'online',  // online, idle, dnd, invisible
+        activities: [{
+            name: 'Track Your Player',
+            type: 3,  // 0: Playing, 1: Streaming, 2: Listening, 3: Watching, 4: Custom, 5: Competing
+            state: 'Track Your Player'
+        }]
+    });
+    
+    // Atau cara singkat:
+    // client.user.setActivity('Track Your Player', { type: 3 }); // 3 = Watching
+    
     const commands = [
         new SlashCommandBuilder()
             .setName('playerall')
