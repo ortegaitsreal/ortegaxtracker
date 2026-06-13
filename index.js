@@ -1,4 +1,4 @@
-// index.js - Bot FiveM Player Tracker (Dengan Code Block untuk Copy)
+// index.js - Bot FiveM Player Tracker (Konsisten Format)
 const { Client, GatewayIntentBits, EmbedBuilder, SlashCommandBuilder, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 require('dotenv').config();
 
@@ -15,7 +15,7 @@ const serverDatabase = [
         port: 30120,
         maxPlayers: 1000,
         logo: "https://cdn.discordapp.com/attachments/1373778515098468382/1485635560537325670/CR.png",
-        description: "Server RP Indonesia terpopuler",
+        description: "Your Roleplay Home with a New Experience 2.0",
         connect: "connect play.ceritaroleplayku.id"
     },
     {
@@ -60,18 +60,15 @@ const serverDatabase = [
     }
 ];
 
-// ============ HAPUS DATABASE LAMA ============
-const fs = require('fs');
-if (fs.existsSync('./data')) {
-    fs.rmSync('./data', { recursive: true, force: true });
-    console.log('🗑️ Database playtime dihapus!');
-}
+// ============ CACHE SYSTEM ============
+const cache = new Map();
+const CACHE_DURATION = 15000;
 
 // ============ CUSTOM EMOJI SIGNAL ============
-const SIGNAL_HIJAU = '<:HIJAU:1515182620017692672>';
-const SIGNAL_KUNING = '<:KUNING:1515182635666636840>';
-const SIGNAL_ORANGE = '<:ORANGE:1515182649436540979>';
-const SIGNAL_RED = '<:RED:1515182666956279941>';
+const SIGNAL_HIJAU = '<:EG:1515432481350750500>';
+const SIGNAL_KUNING = '<:EY:1515432461612617748>';
+const SIGNAL_ORANGE = '<:EO:1515432436337610883>';
+const SIGNAL_RED = '<:ER:1515432406373372205>';
 
 function getSignalSymbol(ping) {
     if (ping <= 50) return SIGNAL_HIJAU;
@@ -99,16 +96,14 @@ async function getServerInfo(server) {
     const baseUrl = `http://${server.ip}:${server.port}`;
     
     try {
-        let infoRes = null;
-        let playersRes = null;
+        const promises = [
+            fetchWithTimeout(`${baseUrl}/info.json`, 8000).catch(() => null),
+            fetchWithTimeout(`${baseUrl}/players.json`, 8000).catch(() => null)
+        ];
         
-        try {
-            infoRes = await fetchWithTimeout(`${baseUrl}/info.json`, 8000);
-        } catch (e) {}
-        
-        try {
-            playersRes = await fetchWithTimeout(`${baseUrl}/players.json`, 8000);
-        } catch (e) {}
+        const results = await Promise.all(promises);
+        let infoRes = results[0];
+        let playersRes = results[1];
 
         let serverData = {
             name: server.name,
@@ -147,27 +142,116 @@ async function getServerInfo(server) {
     }
 }
 
-// ============ MEMBUAT TABEL PLAYER ============
-function createPlayerTable(players, page = 1, itemsPerPage = 20) {
-    if (!players || players.length === 0) return { table: "Tidak ada pemain online", totalPages: 1 };
+// ============ GET SERVER INFO DENGAN CACHE ============
+async function getServerInfoWithCache(server) {
+    const cacheKey = server.id;
+    const now = Date.now();
+    
+    if (cache.has(cacheKey)) {
+        const cached = cache.get(cacheKey);
+        if (now - cached.timestamp < CACHE_DURATION) {
+            return cached.data;
+        }
+    }
+    
+    const data = await getServerInfo(server);
+    cache.set(cacheKey, { data, timestamp: now });
+    return data;
+}
+
+// ============ PARSING MULTIPLE ID ============
+function parseIdInput(input) {
+    const ids = new Set();
+    const parts = input.split(',');
+    
+    for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed.includes('-')) {
+            const range = trimmed.split('-');
+            const start = parseInt(range[0]);
+            const end = parseInt(range[1]);
+            if (!isNaN(start) && !isNaN(end) && start <= end) {
+                for (let i = start; i <= end; i++) {
+                    ids.add(i);
+                }
+            }
+        } else {
+            const num = parseInt(trimmed);
+            if (!isNaN(num)) {
+                ids.add(num);
+            }
+        }
+    }
+    
+    return Array.from(ids).sort((a, b) => a - b);
+}
+
+// ============ MEMBUAT TABEL PLAYER DENGAN MULTIPLE FIELDS ============
+function createPlayerTableFields(players, page = 1, itemsPerPage = 30) {
+    if (!players || players.length === 0) return { fields: [], totalPages: 1 };
     
     const totalPages = Math.ceil(players.length / itemsPerPage);
     const startIndex = (page - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, players.length);
     const pagePlayers = players.slice(startIndex, endIndex);
     
-    let table = "";
+    let currentField = "";
+    let fields = [];
+    let fieldIndex = 1;
+    
     for (const player of pagePlayers) {
         const no = player.no.toString().padStart(2, ' ').padEnd(3, ' ');
         const signal = getSignalSymbol(player.ping);
         const id = player.id.toString().padStart(3, ' ').padEnd(4, ' ');
-        const name = player.name.length > 32 ? player.name.substring(0, 29) + "..." : player.name;
+        const name = player.name.length > 35 ? player.name.substring(0, 32) + "..." : player.name;
         
-        table += `\`${no}\` ${signal} \`${id}\` **${name}**\n`;
-        if (table.length > 900) break;
+        const line = `\`${no}\` ${signal} \`${id}\` **${name}**\n`;
+        
+        if ((currentField + line).length > 980 && currentField.length > 0) {
+            fields.push({ name: `📋 Player List (${fieldIndex})`, value: currentField, inline: false });
+            currentField = line;
+            fieldIndex++;
+        } else {
+            currentField += line;
+        }
     }
     
-    return { table, totalPages };
+    if (currentField.length > 0) {
+        fields.push({ name: `📋 Player List (${fieldIndex})`, value: currentField, inline: false });
+    }
+    
+    return { fields, totalPages };
+}
+
+// ============ MEMBUAT TABEL UNTUK MULTIPLE PLAYER ============
+function createMultiplePlayerTable(players) {
+    if (!players || players.length === 0) return "`Tidak ada pemain ditemukan`";
+    
+    let table = "";
+    for (const player of players) {
+        const no = player.no.toString().padStart(2, ' ').padEnd(3, ' ');
+        const signal = getSignalSymbol(player.ping);
+        const id = player.id.toString().padStart(3, ' ').padEnd(4, ' ');
+        const name = player.name;
+        
+        table += `\`${no}\` ${signal} \`${id}\` **${name}**\n`;
+    }
+    
+    return table;
+}
+
+// ============ MEMBUAT EMBED UNTUK KONDISI TIDAK DITEMUKAN ============
+function createNotFoundEmbed(title, description, serverLogo = null) {
+    const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(description)
+        .addFields({ name: '📋 Hasil Pencarian', value: '`Tidak ada data yang ditemukan`' })
+        .setColor(0xE74C3C)
+        .setFooter({ text: `⚡ Track by FiveM Tracker` })
+        .setTimestamp();
+    
+    if (serverLogo) embed.setThumbnail(serverLogo);
+    return embed;
 }
 
 // ============ PROGRESS BAR ============
@@ -192,6 +276,9 @@ function createPaginationButtons(page, totalPages, serverId, type = "all") {
 client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} siap beraksi!`);
     console.log(`📡 ${serverDatabase.length} server terdaftar`);
+    console.log(`⚡ Cache duration: ${CACHE_DURATION / 1000} detik`);
+    console.log(`📋 Menampilkan 30 player per halaman`);
+    console.log(`🔍 Multiple ID support: 1,2,3 atau 1-10 atau 1,3-5,10`);
     
     client.user.setActivity('Track Your Player', { type: 3 });
     
@@ -203,10 +290,10 @@ client.once('ready', async () => {
             .addStringOption(option => option.setName('server').setDescription('Pilih server').setRequired(true)
                 .addChoices(...serverDatabase.map(s => ({ name: s.name, value: s.id }))))
             .addStringOption(option => option.setName('nama').setDescription('Nama pemain').setRequired(true)),
-        new SlashCommandBuilder().setName('playerid').setDescription('Cari pemain berdasarkan ID')
+        new SlashCommandBuilder().setName('playerid').setDescription('Cari pemain berdasarkan ID (support multiple: 1,2,3 atau 1-10)')
             .addStringOption(option => option.setName('server').setDescription('Pilih server').setRequired(true)
                 .addChoices(...serverDatabase.map(s => ({ name: s.name, value: s.id }))))
-            .addIntegerOption(option => option.setName('id').setDescription('ID pemain').setRequired(true)),
+            .addStringOption(option => option.setName('id').setDescription('ID pemain (contoh: 972 atau 1,2,3 atau 1-10)').setRequired(true)),
         new SlashCommandBuilder().setName('server').setDescription('Lihat daftar server yang tersedia')
     ];
 
@@ -223,7 +310,7 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // /server
+    // ============ /server ============
     if (interaction.commandName === 'server') {
         let serverList = "";
         serverDatabase.forEach((s, idx) => {
@@ -234,42 +321,69 @@ client.on('interactionCreate', async interaction => {
         return;
     }
 
-    // /playerall
+    // ============ /playerall ============
     if (interaction.commandName === 'playerall') {
         await interaction.deferReply();
         const server = serverDatabase.find(s => s.id === interaction.options.getString('server'));
         if (!server) return await interaction.editReply('❌ Server tidak ditemukan');
         
-        const data = await getServerInfo(server);
-        if (!data.online) return await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🔴 ${server.name}`).setDescription('❌ Server offline').setColor(0xE74C3C)] });
-        if (data.playersList.length === 0) return await interaction.editReply({ embeds: [new EmbedBuilder().setTitle(`🌙 ${data.name}`).setDescription('📭 Server sepi').setColor(0x3498DB)] });
+        const startTime = Date.now();
+        const data = await getServerInfoWithCache(server);
+        const fetchTime = Date.now() - startTime;
+        
+        if (!data.online) {
+            const embed = createNotFoundEmbed(`🔴 ${data.name} - Tracker`, `❌ **Server offline**\n\nTidak dapat terhubung ke server.`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
+        
+        if (data.playersList.length === 0) {
+            const embed = createNotFoundEmbed(`🌙 ${data.name} - Tracker`, `📭 **Server sepi**\n\nTidak ada pemain yang sedang online.`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
         
         const avgPing = Math.round(data.playersList.reduce((sum, p) => sum + p.ping, 0) / data.playersList.length);
         const occupancy = Math.round((data.players / data.maxPlayers) * 100);
         const bar = createProgressBar(data.players, data.maxPlayers);
-        const { table, totalPages } = createPlayerTable(data.playersList, 1, 20);
+        const { fields, totalPages } = createPlayerTableFields(data.playersList, 1, 30);
         
-        // ============ CONNECT CODE DENGAN CODE BLOCK (MUDAH COPY) ============
         const connectText = server.connect ? `\n🔌 **Connect:**\n\`\`\`\n${server.connect}\n\`\`\`` : '';
         
         const embed = new EmbedBuilder()
             .setTitle(`${data.name} - Tracker`)
-            .setDescription(`📡 **Server:** ${data.name}\n👥 **Online:** ${data.players}/${data.maxPlayers}\n📶 **Avg Ping:** ${avgPing}ms\n📊 **Occupancy:** ${bar} ${occupancy}%\n🏷️ **Mode:** ${data.gametype}${connectText}`)
-            .addFields({ name: 'Player Online', value: table })
-            .setColor(0x2ECC71).setFooter({ text: `⚡ Track by ${interaction.user.username}` }).setTimestamp();
+            .setDescription(`👥 **Online:** ${data.players}/${data.maxPlayers}\n📊 **Occupancy:** ${bar} ${occupancy}%\n${SIGNAL_HIJAU} **Avg Ping:** ${avgPing}ms\n⚡ **Response:** ${fetchTime}ms${connectText}`)
+            .setColor(0x2ECC71)
+            .setFooter({ text: `⚡ Track by ${interaction.user.username}` })
+            .setTimestamp();
+        
         if (server.logo) embed.setThumbnail(server.logo);
+        
+        for (const field of fields) {
+            embed.addFields(field);
+        }
         
         if (totalPages > 1) {
             const row = createPaginationButtons(1, totalPages, server.id, "all");
             await interaction.editReply({ embeds: [embed], components: [row] });
+            
             let currentPage = 1;
-            const collector = interaction.channel.createMessageComponentCollector({ filter: i => i.user.id === interaction.user.id, time: 60000 });
+            const collector = interaction.channel.createMessageComponentCollector({ 
+                filter: i => i.user.id === interaction.user.id, 
+                time: 60000 
+            });
+            
             collector.on('collect', async i => {
                 if (i.customId.startsWith('all_prev_')) currentPage--;
                 else if (i.customId.startsWith('all_next_')) currentPage++;
                 else return;
-                const { table: newTable } = createPlayerTable(data.playersList, currentPage, 20);
-                const newEmbed = EmbedBuilder.from(embed).spliceFields(0, 1, { name: 'Player Online', value: newTable });
+                
+                const { fields: newFields } = createPlayerTableFields(data.playersList, currentPage, 30);
+                const newEmbed = EmbedBuilder.from(embed);
+                
+                newEmbed.spliceFields(0, embed.data.fields?.length || 0);
+                for (const field of newFields) {
+                    newEmbed.addFields(field);
+                }
+                
                 await i.update({ embeds: [newEmbed], components: [createPaginationButtons(currentPage, totalPages, server.id, "all")] });
             });
         } else {
@@ -278,56 +392,109 @@ client.on('interactionCreate', async interaction => {
         return;
     }
     
-    // /player
+    // ============ /player ============
     if (interaction.commandName === 'player') {
         await interaction.deferReply();
         const server = serverDatabase.find(s => s.id === interaction.options.getString('server'));
         const searchName = interaction.options.getString('nama').toLowerCase();
         if (!server) return await interaction.editReply('❌ Server tidak ditemukan');
         
-        const data = await getServerInfo(server);
-        if (!data.online) return await interaction.editReply(`❌ Server **${server.name}** offline`);
+        const data = await getServerInfoWithCache(server);
+        if (!data.online) {
+            const embed = createNotFoundEmbed(`${data.name} - Tracker`, `❌ **Server offline**\n\nTidak dapat mencari "${searchName}" karena server offline.`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
         
         const matchedPlayers = data.playersList.filter(p => p.name.toLowerCase().includes(searchName));
-        if (matchedPlayers.length === 0) return await interaction.editReply(`❌ Tidak ditemukan "${searchName}" di **${server.name}**`);
+        
+        if (matchedPlayers.length === 0) {
+            const queryUpperCase = searchName.toUpperCase();
+            const embed = createNotFoundEmbed(`${data.name} - Tracker`, `🔍 **Query:** ${searchName}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** ditemukan **0** **${queryUpperCase}**\n${SIGNAL_HIJAU} **Avg Ping:** - ms`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
         
         const avgPing = Math.round(matchedPlayers.reduce((sum, p) => sum + p.ping, 0) / matchedPlayers.length);
-        const { table } = createPlayerTable(matchedPlayers, 1, 10);
+        const { fields } = createPlayerTableFields(matchedPlayers, 1, 30);
         
-        // ============ CONNECT CODE DENGAN CODE BLOCK ============
         const connectText = server.connect ? `\n🔌 **Connect:**\n\`\`\`\n${server.connect}\n\`\`\`` : '';
         
+        const queryUpperCase = searchName.toUpperCase();
+        
         const embed = new EmbedBuilder()
-            .setTitle(`🔍 ${data.name} - Tracker`)
-            .setDescription(`🔍 **Query:** **${searchName}**\n📡 **Server:** ${data.name}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** **${matchedPlayers.length}** ditemukan\n📶 **Avg Ping:** ${avgPing}ms${connectText}`)
-            .addFields({ name: '📋 Hasil Pencarian', value: table })
-            .setColor(0x9B59B6).setFooter({ text: `✨ Requested by ${interaction.user.username}` }).setTimestamp();
+            .setTitle(`${data.name} - Tracker`)
+            .setDescription(`🔍 **Query:** ${searchName}\n👥 **Online:** ${data.players} Pemain\n📊 **Hasil:** ditemukan **${matchedPlayers.length}** **${queryUpperCase}**\n${SIGNAL_HIJAU} **Avg Ping:** ${avgPing}ms${connectText}`)
+            .setColor(0x9B59B6)
+            .setFooter({ text: `✨ Requested by ${interaction.user.username}` })
+            .setTimestamp();
+        
         if (server.logo) embed.setThumbnail(server.logo);
+        
+        for (const field of fields) {
+            embed.addFields(field);
+        }
+        
         await interaction.editReply({ embeds: [embed] });
         return;
     }
     
-    // /playerid
+    // ============ /playerid ============
     if (interaction.commandName === 'playerid') {
         await interaction.deferReply();
         const server = serverDatabase.find(s => s.id === interaction.options.getString('server'));
-        const searchId = interaction.options.getInteger('id');
+        const idInput = interaction.options.getString('id');
         if (!server) return await interaction.editReply('❌ Server tidak ditemukan');
         
-        const data = await getServerInfo(server);
-        if (!data.online) return await interaction.editReply(`❌ Server **${server.name}** offline`);
+        const data = await getServerInfoWithCache(server);
+        if (!data.online) {
+            const embed = createNotFoundEmbed(`🎮 ${data.name} - Player ID Tracker`, `❌ **Server offline**\n\nTidak dapat mencari ID "${idInput}" karena server offline.`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
         
-        const player = data.playersList.find(p => p.id === searchId);
-        if (!player) return await interaction.editReply(`❌ Tidak ditemukan ID **${searchId}** di **${server.name}**`);
+        // Parse multiple ID input
+        const searchIds = parseIdInput(idInput);
         
-        // ============ CONNECT CODE DENGAN CODE BLOCK ============
+        if (searchIds.length === 0) {
+            const embed = createNotFoundEmbed(`🎮 ${data.name} - Player ID Tracker`, `❌ **Format ID tidak valid**\n\nGunakan format: 972 atau 1,2,3 atau 1-10`, server.logo);
+            return await interaction.editReply({ embeds: [embed] });
+        }
+        
+        // Cari player berdasarkan ID
+        const foundPlayers = [];
+        const notFoundIds = [];
+        
+        for (const id of searchIds) {
+            const player = data.playersList.find(p => p.id === id);
+            if (player) {
+                foundPlayers.push(player);
+            } else {
+                notFoundIds.push(id);
+            }
+        }
+        
+        const avgPing = Math.round(data.playersList.reduce((sum, p) => sum + p.ping, 0) / data.playersList.length);
         const connectText = server.connect ? `\n🔌 **Connect:**\n\`\`\`\n${server.connect}\n\`\`\`` : '';
         
+        let description = `👥 **Online:** ${data.players}/${data.maxPlayers}\n`;
+        description += `🔍 **Cari ID:** ${idInput}\n`;
+        description += `📊 **Ditemukan:** ${foundPlayers.length} dari ${searchIds.length} ID\n`;
+        description += `${SIGNAL_HIJAU} **Avg Ping:** ${avgPing}ms${connectText}`;
+        
+        if (notFoundIds.length > 0) {
+            description += `\n\n⚠️ **ID Tidak Ditemukan:** ${notFoundIds.join(', ')}`;
+        }
+        
+        const table = createMultiplePlayerTable(foundPlayers);
+        
         const embed = new EmbedBuilder()
-            .setTitle(`👤 Player Detail`)
-            .setDescription(`${getSignalSymbol(player.ping)} **${player.name}**\n🆔 **ID:** ${player.id}\n📶 **Ping:** ${player.ping}ms${connectText}`)
-            .setColor(0x2ECC71).setFooter({ text: `⚡ Data real-time • ${data.name}` }).setTimestamp();
+            .setTitle(`${data.name} - Player ID Tracker`)
+            .setDescription(description)
+            .addFields({ name: '🎯 Player Ditemukan', value: table })
+            .setColor(foundPlayers.length > 0 ? 0x2ECC71 : 0xE74C3C)
+            .setFooter({ text: `⚡ Track by ${interaction.user.username}` })
+            .setTimestamp();
+        
         if (server.logo) embed.setThumbnail(server.logo);
+        
         await interaction.editReply({ embeds: [embed] });
         return;
     }
